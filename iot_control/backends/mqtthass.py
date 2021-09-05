@@ -98,6 +98,16 @@ class BackendMqttHass(IoTBackendBase):
                     self.logger.debug("new mqtt value for %s : %s", state_topic, val)
                     self.mqtt_client.publish(state_topic, val, retain=True)
 
+        elif "poscovers" in device.conf:
+            for entry in data:
+                if entry in state_topics:
+                    #val = data[entry]
+                    val = {entry: data[entry]}
+                    state_topic = state_topics[entry]
+                    self.logger.debug("new mqtt value for %s : %s", state_topic, val)
+                    #self.mqtt_client.publish(state_topic, val, retain=True)
+                    self.mqtt_client.publish(state_topic, json.dumps(val), retain=True)
+
         else:
             self.logger.error("workon(): unknown device type %s", device.conf)
 
@@ -328,6 +338,77 @@ class BackendMqttHass(IoTBackendBase):
                 except Exception as exception:
                     self.logger.error(
                         "error announcing cover: %s", exception)
+
+            elif "poscovers" in device.conf:
+
+                # get list of covers on device
+                covers = device.conf["poscovers"]
+                # create a state topic for everyone
+                try:
+                    cover_cfg = device.conf["poscovers"]
+
+                    for cover in covers:
+                        self.logger.info("MQTT announcing positional cover %s", cover)
+                        try:
+                            sconf = cover_cfg[cover]
+
+                            config_topic = "{}/cover/{}/{}/config".format(
+                                self.config["hass_discovery_prefix"],
+                                sconf["unique_id"], cover)
+                            position_topic = "{}/cover/{}/position".format(
+                                self.config["hass_discovery_prefix"],
+                                sconf["unique_id"])
+                            set_position_topic = "{}/cover/{}/set_position".format(
+                                self.config["hass_discovery_prefix"],
+                                sconf["unique_id"])
+                            avail_topic = "{}/cover/{}/avail".format(
+                                self.config["hass_discovery_prefix"],
+                                sconf["unique_id"])
+                            command_topic = "{}/cover/{}/command".format(
+                                self.config["hass_discovery_prefix"],
+                                sconf["unique_id"])
+                            self.avail_topics.append(avail_topic)
+                            state_topics[cover] = position_topic
+                            conf_dict = {
+                                "name": sconf["name"],
+                                "unique_id": sconf["unique_id"],
+                                "position_topic": position_topic,
+                                "set_position_topic": set_position_topic,
+                                "availability_topic": avail_topic,
+                                "command_topic": command_topic,
+                                "value_template": "{{ value_json." + cover + " }}",
+                                "payload_available": self.config["online_payload"],
+                                "payload_not_available": self.config["offline_payload"],
+                                "position_open": 100,
+                                "position_closed": 0,
+                                "payload_open": sconf["payload_open"],
+                                "payload_close": sconf["payload_close"],
+                                "payload_stop": sconf["payload_stop"],
+                                "optimistic": "false"
+                            }
+                            payload = json.dumps(conf_dict)
+                            self.logger.info("publishing: %s", payload)
+                            result = self.mqtt_client.publish(
+                                config_topic, payload, retain=True)
+                            result = self.mqtt_client.publish(
+                                avail_topic, self.config["online_payload"], retain=True)
+
+                            # now subscribe to the command topic
+                            (result, _) = self.mqtt_client.subscribe(command_topic)
+                            self.logger.info("subscription result: %s", result)
+                            self.command_topics[command_topic] = [device, cover, position_topic]
+
+                            # now subscribe to the set_position topic
+                            (result, _) = self.mqtt_client.subscribe(set_position_topic)
+                            self.logger.info("subscription result: %s", result)
+                            self.command_topics[set_position_topic] = [device, cover, position_topic]
+
+                        except Exception as exception:
+                            self.logger.error("problem bringing poscover %s up: %s",
+                                              cover, exception)
+                except Exception as exception:
+                    self.logger.error(
+                        "error announcing poscover: %s", exception)
 
             else:
                 self.logger.error("announce(): unknown device type %s", device.conf)
