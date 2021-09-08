@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-""" Raspi cover device
+""" Raspi state cover device
 """
 import time
 import logging
@@ -11,7 +11,7 @@ from iot_control.iotdevicebase import IoTDeviceBase
 from iot_control.iotfactory import IoTFactory
 
 
-@IoTFactory.register_device("raspi-cover")
+@IoTFactory.register_device("raspi-state-cover")
 class IoTraspicover(IoTDeviceBase):
     """ Cover pr garage door with two input GPIO pins for detecting the
     closed and open states and one output GPIO pin triggering the motor
@@ -116,7 +116,7 @@ class IoTraspicover(IoTDeviceBase):
         self.translate_status[IoTraspicover.STATE_UNKNOWN] = self.state_unknown
         self.translate_status[IoTraspicover.STATE_ILLEGAL] = self.state_unknown
 
-        covers_cfg = setupdata["covers"]
+        covers_cfg = setupdata["statecovers"]
 
         def callback(pin):
             """ Helper callback function providing all the interesting

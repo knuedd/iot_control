@@ -1,4 +1,4 @@
-# State model for the iot raspi cover device
+# State model for the iot raspi state cover device
 
 ## Pins
 
