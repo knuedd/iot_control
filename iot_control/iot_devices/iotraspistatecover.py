@@ -187,7 +187,7 @@ class IoTraspicover(IoTDeviceBase):
         time.sleep(0.1)
         GPIO.output(cfg["pin_trigger"], GPIO.LOW)
 
-        time.sleep(0.1)
+        time.sleep(1.0)
 
         GPIO.output(cfg["pin_trigger"], GPIO.HIGH)
         time.sleep(0.1)
