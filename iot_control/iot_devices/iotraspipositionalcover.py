@@ -25,26 +25,6 @@ class IoTraspipositionalcover(IoTDeviceBase):
 
     logger = None
 
-    # constants for the internal state, they get translated into what HA/MQTT understand
-    STATE_OPEN = 1
-    STATE_OPENING = 2
-    STATE_CLOSED = 3
-    STATE_CLOSING = 4
-    STATE_STOPPED_OPENING = 5
-    STATE_STOPPED_CLOSING = 6
-    STATE_UNKNOWN = 7
-    STATE_ILLEGAL = 8
-
-    # translate above constants into the proper values as cover config says
-    # and as HA/MQTT understand
-    translate_status = {}
-
-    state_open = "open"
-    state_opening = "opening"
-    state_closed = "closed"
-    state_closing = "closing"
-    state_unknown = "unknown"
-
     # stores mapping of covers to pins
     poscovers = {}
 
@@ -66,13 +46,14 @@ class IoTraspipositionalcover(IoTDeviceBase):
         self.step= setupdata["position_open"] // 100
         self.sleeptime= setupdata["sleeptime"] * 0.001
 
+        state_file= setupdata["state_file"]
+
         covers_cfg = setupdata["poscovers"]
 
         for cover in covers_cfg:
 
             cfg = covers_cfg[cover]
 
-            state_file= cfg["state_file"]
 
             for pin in cfg["motorpins"]:
                 GPIO.setup(pin,GPIO.OUT)
