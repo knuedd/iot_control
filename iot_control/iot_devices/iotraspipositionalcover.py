@@ -9,6 +9,7 @@ from typing import Dict
 import RPi.GPIO as GPIO
 from iot_control.iotdevicebase import IoTDeviceBase
 from iot_control.iotfactory import IoTFactory
+import json
 
 motorstep= []
 motorstep.append( [ GPIO.HIGH, GPIO.LOW,  GPIO.HIGH, GPIO.LOW  ] )
@@ -46,7 +47,7 @@ class IoTraspipositionalcover(IoTDeviceBase):
         self.step= setupdata["position_open"] // 100
         self.sleeptime= setupdata["sleeptime"] * 0.001
 
-        state_file= setupdata["state_file"]
+        self.state_file= setupdata["state_file"]
 
         covers_cfg = setupdata["poscovers"]
 
@@ -71,6 +72,14 @@ class IoTraspipositionalcover(IoTDeviceBase):
 
             self.poscovers[cover] = cfg
 
+        # read the old state if present
+        val = {}
+        with open(self.state_file,"r") as f:
+            val= json.load(f)
+
+            for cover in covers_cfg:
+                self.poscovers[cover]["status"]= val[cover]
+                self.poscovers[cover]["target"]= val[cover]
 
     #as for four phase stepping motor, four steps is a cycle. the function is used to drive the stepping motor clockwise or anticlockwise to take four steps    
     def move_one_period(self,direction,ms, motorpins):
@@ -102,17 +111,15 @@ class IoTraspipositionalcover(IoTDeviceBase):
     def read_data(self) -> Dict:
 
         val = {}
+        changed= False # at least one cover changed
         for cover in self.poscovers:
 
-            if self.poscovers[cover]["target"] == self.poscovers[cover]["status"]:
-
-                val[cover] = self.poscovers[cover]["status"]
-
-            
             # if the status is != the target value, then this is the place to act
             # it will make the cover move a small bit here bevore returning the new value
             # and then triggering the runtime to call our read_data() again very soon
-            else: # self.poscovers[cover]["target"] != self.poscovers[cover]["status"] :
+            if self.poscovers[cover]["target"] != self.poscovers[cover]["status"]:
+
+                changed= True
 
                 if self.poscovers[cover]["target"] > self.poscovers[cover]["status"]:
 
@@ -127,15 +134,44 @@ class IoTraspipositionalcover(IoTDeviceBase):
                     self.move_steps( 1, self.sleeptime, delta*self.step, self.poscovers[cover]["motorpins"] )
                     self.poscovers[cover]["status"] -= delta
                     val[cover] = self.poscovers[cover]["status"]
-                    
-                ## depending on final state trigger following step 
-                if self.poscovers[cover]["target"] != self.poscovers[cover]["status"] :
 
-                    self.runtime.trigger_for_device(self)
-
-                else:
+                ## are we don moving now? Then stop motor for this cover
+                if self.poscovers[cover]["target"] == self.poscovers[cover]["status"]:
 
                     self.motor_stop( self.poscovers[cover]["motorpins"] )
+    
+                # if one poscover was moved one step, don't go on to the next but break the cover loop
+                # this makes one cover move to the final position before the next starts moving
+                # which is much nicer and smoother
+                break
+
+        
+        needtochange= False # at least one cover that needs to change some more?
+        for cover in self.poscovers:
+
+            if self.poscovers[cover]["target"] != self.poscovers[cover]["status"]:
+
+                needtochange= True
+
+            val[cover] = self.poscovers[cover]["status"]
+
+
+        if needtochange:
+
+            self.runtime.trigger_for_device(self)
+
+        else:
+
+            if changed:
+
+                # only if something changed and there are no scheduled further changes on another cover
+                # safe the states out to state_file, where it can be read in in __init__() after a restart
+                # this avoids too frequent write operation which the SD card wounldn't like so much
+                with open(self.state_file,'w') as f:
+                    json.dump(val,f)
+
+                # need to trigger on last time so that the target value gets transfered
+                self.runtime.trigger_for_device(self)
 
         return val
 
