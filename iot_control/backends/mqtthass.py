@@ -90,7 +90,7 @@ class BackendMqttHass(IoTBackendBase):
                     self.logger.debug("new mqtt value for %s : %s", state_topic, val)
                     self.mqtt_client.publish(state_topic, val, retain=True)
 
-        elif "covers" in device.conf:
+        elif "statecovers" in device.conf:
             for entry in data:
                 if entry in state_topics:
                     val = data[entry]
@@ -274,16 +274,16 @@ class BackendMqttHass(IoTBackendBase):
                     self.logger.error(
                         "error announcing sensor: %s", exception)
 
-            elif "covers" in device.conf:
+            elif "statecovers" in device.conf:
                 # get list of covers on device
-                covers = device.conf["covers"]
+                covers = device.conf["statecovers"]
                 # create a state topic for everyone
                 try:
-                    cover_cfg = device.conf["covers"]
+                    #cover_cfg = device.conf["statecovers"]
                     for cover in covers:
                         self.logger.info("MQTT announcing cover %s", cover)
                         try:
-                            sconf = cover_cfg[cover]
+                            sconf = covers[cover]
                             config_topic = "{}/cover/{}/{}/config".format(
                                 self.config["hass_discovery_prefix"],
                                 sconf["unique_id"], cover)
@@ -307,13 +307,13 @@ class BackendMqttHass(IoTBackendBase):
                                 "value_template": "{{ value_json." + cover + " }}",
                                 "payload_available": self.config["online_payload"],
                                 "payload_not_available": self.config["offline_payload"],
-                                "state_open": self.config["state_open"],
-                                "state_opening": self.config["state_opening"],
-                                "state_closed": self.config["state_closed"],
-                                "state_closing": self.config["state_closing"],
-                                "payload_open": self.config["payload_open"],
-                                "payload_close": self.config["payload_close"],
-                                "payload_stop": self.config["payload_stop"],
+                                "state_open": device.conf["state_open"],
+                                "state_opening": device.conf["state_opening"],
+                                "state_closed": device.conf["state_closed"],
+                                "state_closing": device.conf["state_closing"],
+                                "payload_open": device.conf["payload_open"],
+                                "payload_close": device.conf["payload_close"],
+                                "payload_stop": device.conf["payload_stop"],
                                 "optimistic": "false"
                             }
                             payload = json.dumps(conf_dict)
@@ -322,7 +322,6 @@ class BackendMqttHass(IoTBackendBase):
                                 config_topic, payload, retain=True)
                             result = self.mqtt_client.publish(
                                 avail_topic, self.config["online_payload"], retain=True)
-
                             # now subscribe to the command topic
                             (result, _) = self.mqtt_client.subscribe(
                                 command_topic)
@@ -337,7 +336,7 @@ class BackendMqttHass(IoTBackendBase):
                                               cover, exception)
                 except Exception as exception:
                     self.logger.error(
-                        "error announcing cover: %s", exception)
+                        "error announcing statecovers: %s", exception)
 
             elif "poscovers" in device.conf:
 
@@ -345,12 +344,12 @@ class BackendMqttHass(IoTBackendBase):
                 covers = device.conf["poscovers"]
                 # create a state topic for everyone
                 try:
-                    cover_cfg = device.conf["poscovers"]
+                    #cover_cfg = device.conf["poscovers"]
 
                     for cover in covers:
                         self.logger.info("MQTT announcing positional cover %s", cover)
                         try:
-                            sconf = cover_cfg[cover]
+                            sconf = covers[cover]
 
                             config_topic = "{}/cover/{}/{}/config".format(
                                 self.config["hass_discovery_prefix"],
@@ -408,7 +407,7 @@ class BackendMqttHass(IoTBackendBase):
                                               cover, exception)
                 except Exception as exception:
                     self.logger.error(
-                        "error announcing poscover: %s", exception)
+                        "error announcing poscovers: %s", exception)
 
             else:
                 self.logger.error("announce(): unknown device type %s", device.conf)
