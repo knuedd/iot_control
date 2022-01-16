@@ -11,6 +11,7 @@ from iot_control.iotruntime import IoTRuntime
 if __name__ == '__main__':
 
     # Creates a runtime that will run everything
-    runtime = IoTRuntime("setup.yaml", logging.DEBUG)
+    #runtime = IoTRuntime("setup.yaml", logging.DEBUG)
+    runtime = IoTRuntime("setup.yaml", logging.INFO)
     runtime.set_intervall(60)
     runtime.loop_forever()
