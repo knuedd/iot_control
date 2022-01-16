@@ -16,6 +16,7 @@ import iot_control.iot_devices.iotbme280
 import iot_control.iot_devices.iotbh1750
 import iot_control.iot_devices.iotraspigpio
 import iot_control.iot_devices.iotcommandswitch
+import iot_control.iot_devices.iotpcf8591pulses
 import iot_control.iot_devices.iotraspibinarysensor
 import iot_control.iot_devices.iotraspistatecover
 import iot_control.iot_devices.iotraspipositionalcover
