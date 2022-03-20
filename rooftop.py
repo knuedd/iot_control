@@ -12,6 +12,7 @@ if __name__ == '__main__':
 
     # Creates a runtime that will run everything
     #runtime = IoTRuntime("setup.yaml", logging.DEBUG)
-    runtime = IoTRuntime("setup.yaml", logging.INFO)
+    #runtime = IoTRuntime("setup.yaml", logging.INFO)
+    runtime = IoTRuntime("setup.yaml", logging.WARNING)
     runtime.set_intervall(60)
     runtime.loop_forever()
