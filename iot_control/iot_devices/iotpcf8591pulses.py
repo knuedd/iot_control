@@ -29,8 +29,6 @@ class IoTpcf8591pulses(IoTDeviceBase):
         num= len(self.values)
         sleeptime= 0.010
 
-        print("    internal_background_thread ", num, " values" )
-
         currvalue= {}
         lastvalue= {}
         for i in self.values:
@@ -46,10 +44,7 @@ class IoTpcf8591pulses(IoTDeviceBase):
                 #print( "   ", i, lastvalue[i], currvalue[i] )
 
                 if currvalue[i] < lastvalue[i] // 2 :
-                    #print( "pulse" )
                     self.values[i] += self.factors[i]
-                #else:
-                #    print( "_" )
 
             time.sleep(sleeptime)
 
@@ -68,23 +63,22 @@ class IoTpcf8591pulses(IoTDeviceBase):
 
         if msg.topic == self.mqtt_topic :
 
-            print( "IoTpcf8591pulses.mqtt_callback_message() ", msg.topic, msg.payload )
-            print( "    adopting external values", msg.payload )
-            print( "       values before: ", self.values )
+            self.logger.warning( "IoTpcf8591pulses.mqtt_callback_message() '{}' with payload '{}', adopting values".format( msg.topic, msg.payload ) )
             payload = json.loads( msg.payload )  ##msg.payload.decode("utf-8")
-            print( "       external values decoded", msg.payload )
             for i in payload:
                 if i in self.values:
-                    self.values[i]= float( payload[i] )
-                    
-            print( "       values after: ", self.values )
+                    newval= float( payload[i] )
+                    self.logger.warning( "    old value {}, new value {}, delta {}".format( self.values[i], newval, ( newval - self.values[i] ) ) )
+                    self.values[i]= newval
 
             # change the accepted topic, only for the very first one it is going to listen to
             # self.mqtt_topic_periodic. From the second time on it is only listening to self.mqtt_topic_reset
             self.mqtt_topic= self.mqtt_topic_reset
+            
+            self.mqtt_client.unsubscribe( self.mqtt_topic_periodic )
 
         else :
-            print( "IoTpcf8591pulses.mqtt_callback_message() ", msg.topic, msg.payload, " IGNORED " )
+            self.logger.warning( "IoTpcf8591pulses.mqtt_callback_message() unexpected message '{}' '{}' ignored".format( msg.topic, msg.payload ))
 
 
     def mqtt_callback_disconnect(self, client, userdata, rc):
@@ -112,95 +106,53 @@ class IoTpcf8591pulses(IoTDeviceBase):
         if "internal_mqtt_server" in setupdata and "internal_mqtt_port" in setupdata and "internal_mqtt_user" in setupdata and "internal_mqtt_password" in setupdata :
 
             self.retain= True
-            print( "       retaining enabled" )
-
-        else:
-            print( "       retaining disabled" )
-
-        print( "IoTpcf8591pulses.__init__: ", setupdata )
 
         self.values= {}
         self.factors= {}
         self.channels= {}
         for s in setupdata["sensors"]:
-            print( "    ", s, " --> ", setupdata["sensors"][s] )
             self.values[s]= setupdata["sensors"][s]["recentvalue"]
             self.factors[s]= setupdata["sensors"][s]["factor"]
             self.channels[s]= setupdata["sensors"][s]["channel"]
 
-        print( "    sensors: ", self.values.keys(), " ====================" )
-        print( "        values:   ", self.values )
-        print( "        factors:  ", self.factors )
-        print( "        channels: ", self.channels )
-
-
         # if there are values from the MQTT channel then the recent values from the config above are ignored
-        print( "    TODO: try to read last values from separate MQTT channel" )
         if True == self.retain :
 
-            print( "       prepare retaining functionality" )
-
             self.mqtt_client= mqtt.Client(client_id="iot_control_pcf8591pulse_"+str(socket.gethostname()))
-            print( "       A" )
             self.mqtt_client.on_connect = self.mqtt_callback_connect
-            print( "       B" )
             self.mqtt_client.on_message = self.mqtt_callback_message
-            print( "       C" )
             self.mqtt_client.on_disconnect = self.mqtt_callback_disconnect
-            print( "       D" )
             self.logger.info("connection to mqtt server")
-            print( "       E" )
 
 
             self.mqtt_client.username_pw_set( username= setupdata['internal_mqtt_user'], 
                                               password= setupdata['internal_mqtt_password'] )
-            print( "       F" )
             self.mqtt_client.connect( setupdata['internal_mqtt_server'], setupdata['internal_mqtt_port'], keepalive= 60 )
-            print( "       G" )
             self.mqtt_client.loop_start()
-            print( "       Z" )
 
-
-        print( "    TODO: done reading last values from separate MQTT channel" )
-
-
-        print( "going to start background thread" )
-     
         self.t= threading.Thread( target=background_thread, args=(self,), daemon= True )
         self.t.start()
 
-        print( "background thread has started" )
-
  
     def read_data(self) -> Dict:
-
-        print( "read_data() ", self.values )
 
         val= {}
         for i in self.values:
             val[i]= "{:.3f}".format(self.values[i])
 
         if True == self.retain :
-            print( "    TODO: save current values to separate MQTT channel" )
 
             payload = json.dumps(val)
             self.logger.info("MQTT for IoTpcf8591pulses publishing: %s", payload)
-            print( "MQTT for IoTpcf8591pulses publishing: ", self.mqtt_topic_periodic, payload )
             result = self.mqtt_client.publish( self.mqtt_topic_periodic, payload, retain=True )
-            print( "MQTT for IoTpcf8591pulses publishing: done, result ", result )
-
-
-            print( "    TODO: check for external reset message from MQTT to reset the values by force" )
-
-
-            print( "    TODO: done checking for external reset message from MQTT to reset the values by force" )
-
 
         return val
 
+
     def sensor_list(self) -> list:
-        print("THIS IS NEVER CALLED, IS IT?")
+        self.logger.warning("IoTpcf8591pulses.sensor_list(): THIS IS NEVER CALLED, IS IT?")
         return self.values.keys()
+
 
     def set_state(self, _) -> bool:
         """ nothing can be set here """
@@ -211,8 +163,5 @@ class IoTpcf8591pulses(IoTDeviceBase):
 # must not be a method
 def background_thread( obj ):
 
-    print( "me background thread: A " )
-
     obj.internal_background_thread()
 
-    print( "me background thread: Z " )
