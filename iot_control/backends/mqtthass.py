@@ -159,7 +159,7 @@ class BackendMqttHass(IoTBackendBase):
                             result = self.mqtt_client.publish(
                                 avail_topic, self.config["online_payload"], retain=True)
                         except Exception as exception:
-                            self.logger.error("problem bringing sensor %s up: %s",
+                            self.logger.error("problem 1 bringing sensor %s up: %s",
                                               sensor, exception)
                 except Exception as exception:
                     self.logger.error(
@@ -268,7 +268,7 @@ class BackendMqttHass(IoTBackendBase):
                             result = self.mqtt_client.publish(
                                 avail_topic, self.config["online_payload"], retain=True)
                         except Exception as exception:
-                            self.logger.error("problem bringing sensor %s up: %s",
+                            self.logger.error("problem 2 bringing sensor %s up: %s",
                                               sensor, exception)
                 except Exception as exception:
                     self.logger.error(
@@ -332,7 +332,7 @@ class BackendMqttHass(IoTBackendBase):
                             ]
 
                         except Exception as exception:
-                            self.logger.error("problem bringing cover %s up: %s",
+                            self.logger.error("problem 3 bringing cover %s up: %s",
                                               cover, exception)
                 except Exception as exception:
                     self.logger.error(
@@ -403,7 +403,7 @@ class BackendMqttHass(IoTBackendBase):
                             self.command_topics[set_position_topic] = [device, cover, position_topic]
 
                         except Exception as exception:
-                            self.logger.error("problem bringing poscover %s up: %s",
+                            self.logger.error("problem 4 bringing poscover %s up: %s",
                                               cover, exception)
                 except Exception as exception:
                     self.logger.error(
