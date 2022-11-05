@@ -55,6 +55,8 @@ class IoTraspicover(IoTDeviceBase):
         state_pin_up = not GPIO.input(pin_up)
         state_pin_down = not GPIO.input(pin_down)
 
+        #print( "callback {}, pin_up {}: {}, pin_down {}: {}".format(pin,pin_up,state_pin_up,pin_down,state_pin_down))
+
         if state_pin_up and state_pin_down:
             self.logger.error("IoTraspicover.__callback(): both input pins "
                               "true --> illegal state")
@@ -118,8 +120,6 @@ class IoTraspicover(IoTDeviceBase):
 
         covers_cfg = setupdata["statecovers"]
 
-        
-
         def callback(pin):
             """ Helper callback function providing all the interesting
             arguments that the stupid API of GPIO.add_event_detect() doesn't
@@ -166,6 +166,7 @@ class IoTraspicover(IoTDeviceBase):
                                   bouncetime=100)
             GPIO.add_event_detect(pin_down, GPIO.BOTH, callback=callback,
                                   bouncetime=100)
+
 
     def read_data(self) -> Dict:
         """ don't read real data or gpios but just return the stored status  """
