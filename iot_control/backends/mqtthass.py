@@ -108,6 +108,16 @@ class BackendMqttHass(IoTBackendBase):
                     #self.mqtt_client.publish(state_topic, val, retain=True)
                     self.mqtt_client.publish(state_topic, json.dumps(val), retain=True)
 
+        elif "pwmlights" in device.conf:
+            for entry in data:
+                if entry in state_topics:
+                    #val = data[entry]
+                    val = {entry: data[entry]}
+                    state_topic = state_topics[entry]
+                    self.logger.debug("new mqtt value for %s : %s", state_topic, val)
+                    #self.mqtt_client.publish(state_topic, val, retain=True)
+                    self.mqtt_client.publish(state_topic, json.dumps(val), retain=True)
+
         else:
             self.logger.error("workon(): unknown device type %s", device.conf)
 
@@ -408,6 +418,85 @@ class BackendMqttHass(IoTBackendBase):
                 except Exception as exception:
                     self.logger.error(
                         "error announcing poscovers: %s", exception)
+
+            elif "pwmlights" in device.conf:
+
+                # get list of lights on device
+                lights = device.conf["pwmlights"]
+                # create a state topic for everyone
+                try:
+                    #cover_cfg = device.conf["poscovers"]
+
+                    for light in lights:
+                        self.logger.info("MQTT announcing pwm light %s", light)
+                        try:
+                            sconf = lights[light]
+
+                            config_topic = "{}/light/{}/{}/config".format(
+                                self.config["hass_discovery_prefix"],
+                                sconf["unique_id"], light)
+
+                            state_topic= "{}/light/{}/status".format(
+                                self.config["hass_discovery_prefix"],
+                                sconf["unique_id"])
+                            command_topic = "{}/light/{}/switch".format(
+                                self.config["hass_discovery_prefix"],
+                                sconf["unique_id"])
+                            brightness_state_topic= "{}/light/{}/brightness".format(
+                                self.config["hass_discovery_prefix"],
+                                sconf["unique_id"])
+                            brightness_command_topic= "{}/light/{}/brightness/set".format(
+                                self.config["hass_discovery_prefix"],
+                                sconf["unique_id"])
+
+                            avail_topic = "{}/light/{}/avail".format(
+                                self.config["hass_discovery_prefix"],
+                                sconf["unique_id"])
+
+                            self.avail_topics.append(avail_topic)
+                            state_topics[light]= state_topic
+
+                            conf_dict = {
+                                "name": sconf["name"],
+                                "unique_id": sconf["unique_id"],
+                                "state_topic": state_topic,
+                                "command_topic": command_topic,
+                                "brightness_state_topic": brightness_state_topic,
+                                "brightness_command_topic": brightness_command_topic,
+                                "value_template": "{{ value_json." + light + " }}",
+                                "qos": 0,
+                                "payload_on": "ON",
+                                "payload_off": "OFF",
+                                "optimistic": "true"
+                            }
+                            payload = json.dumps(conf_dict)
+                            self.logger.info("publishing: %s", payload)
+                            result = self.mqtt_client.publish(
+                                config_topic, payload, retain=True)
+                            result = self.mqtt_client.publish(
+                                avail_topic, self.config["online_payload"], retain=True)
+
+                            # subscribe to the command topic
+                            (result, _) = self.mqtt_client.subscribe(command_topic)
+                            self.logger.info("subscription result: %s", result)
+                            self.command_topics[command_topic] = [device, light, command_topic]
+
+                            # subscribe to the brightness_state_topic
+                            (result, _) = self.mqtt_client.subscribe(brightness_state_topic)
+                            self.logger.info("subscription result: %s", result)
+                            self.command_topics[brightness_state_topic] = [device, light, brightness_state_topic]
+
+                            # subscribe to the brightness_command_topic
+                            (result, _) = self.mqtt_client.subscribe(brightness_command_topic)
+                            self.logger.info("subscription result: %s", result)
+                            self.command_topics[brightness_command_topic] = [device, light, brightness_command_topic]
+
+                        except Exception as exception:
+                            self.logger.error("problem 4 bringing pwmlight %s up: %s",
+                                              light, exception)
+                except Exception as exception:
+                    self.logger.error(
+                        "error announcing pwmlights: %s", exception)
 
             else:
                 self.logger.error("announce(): unknown device type %s", device.conf)
