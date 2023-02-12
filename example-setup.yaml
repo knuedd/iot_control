@@ -83,20 +83,20 @@ devices:
         unique_id: "pressure_rooftop"
         unit_of_measurement: "hPa"
         expire_after: 370
-raspi-binary-sensor:
-    payload_off: "OFF"
-    payload_on: "ON"
-    binary-sensors:
-      button:
-        name: Button
-        unique_id: "button"
-        device_class: door  # device class according to https://www.home-assistant.io/integrations/binary_sensor/#device-class
-        pin: 15 # PIN as GPIO number, not board number
-      anotherbutton:
-        name: Anotherbutton
-        unique_id: "button2"
-        device_class: window  # device class according to https://www.home-assistant.io/integrations/binary_sensor/#device-class
-        pin: 18 # PIN as GPIO number, not board number
+    raspi-binary-sensor:
+        payload_off: "OFF"
+        payload_on: "ON"
+        binary-sensors:
+            button:
+                name: Button
+                unique_id: "button"
+                device_class: door  # device class according to https://www.home-assistant.io/integrations/binary_sensor/#device-class
+                pin: 15 # PIN as GPIO number, not board number
+            anotherbutton:
+                name: Anotherbutton
+                unique_id: "button2"
+                device_class: window  # device class according to https://www.home-assistant.io/integrations/binary_sensor/#device-class
+                pin: 18 # PIN as GPIO number, not board number
   raspi-cover:
     payload_open: "OPEN"
     payload_close: "CLOSE"
@@ -112,3 +112,40 @@ raspi-binary-sensor:
         pin_down: 14 # input pin which reads closed when the cover is open/up
         pin_up: 18 # input pin which reads closed when the cover is closed/down
         pin_trigger: 26 # output pin which triggers motor controller
+  raspi-positional-cover:
+    payload_open: "OPEN"
+    payload_close: "CLOSE"
+    payload_stop: "STOP"
+    position_open: 1600 
+    sleeptime: 6 # 6ms sleep between steps
+    state_file: "fensterposition.json"
+    poscovers:
+      fenster_links:
+        name: "GWH Fenster links"
+        unique_id: "fenster_links"
+        motorpins:
+            - 12 # Board 32
+            - 16 # Board 36
+            - 20 # Board 38
+            - 21 # Board 40
+      fenster_rechts:
+        name: "GWH Fenster rechts"
+        unique_id: "fenster_rechts"
+        motorpins: 
+            - 18 # Board 12
+            - 23 # Board 16
+            - 24 # Board 18
+            - 25 # Board 22
+  raspi-pwm-light:
+    payload_on: "ON"
+    payload_off: "OFF"
+    pwmlights:
+      terrasse:
+        name: "First Light"
+        unique_id: "firstlight"
+        pins: # pins connected to the motor controller, one works as 3V the other as ground
+            - 23
+            - 24
+        pinpwm: 25 # output pin which triggers motor controller
+        minval: 20 # adjust to minimum percentage where light is emmitted, brightness command 1% will be cast to this value
+        maxval: 100 # maximum value allowed, use to limit maximum brightness
