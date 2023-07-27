@@ -364,6 +364,9 @@ class BackendMqttHass(IoTBackendBase):
                             config_topic = "{}/cover/{}/{}/config".format(
                                 self.config["hass_discovery_prefix"],
                                 sconf["unique_id"], cover)
+                            state_topic = "{}/cover/{}/state".format(
+                                self.config["hass_discovery_prefix"],
+                                sconf["unique_id"])
                             position_topic = "{}/cover/{}/position".format(
                                 self.config["hass_discovery_prefix"],
                                 sconf["unique_id"])
@@ -381,6 +384,7 @@ class BackendMqttHass(IoTBackendBase):
                             conf_dict = {
                                 "name": sconf["name"],
                                 "unique_id": sconf["unique_id"],
+                                "state_topic": state_topic,
                                 "position_topic": position_topic,
                                 "set_position_topic": set_position_topic,
                                 "availability_topic": avail_topic,
