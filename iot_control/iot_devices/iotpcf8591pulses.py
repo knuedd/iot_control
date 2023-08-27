@@ -14,8 +14,9 @@ import json
 from iot_control.iotdevicebase import IoTDeviceBase
 from iot_control.iotfactory import IoTFactory
 
+import datetime
 import paho.mqtt.client as mqtt
-
+import influxdb
 
 @IoTFactory.register_device("pcf8591pulses")
 class IoTpcf8591pulses(IoTDeviceBase):
@@ -35,18 +36,62 @@ class IoTpcf8591pulses(IoTDeviceBase):
             currvalue[i]= 0
             lastvalue[i]= 255
 
+        LIMIT= 3.0 # rate limit, if actual rate > than LIMIT trace values
+
+        BATCHSIZE= 1000
+        messages= [{}] * BATCHSIZE
+        count= 0
+
         while True:
+
+            message = {
+                "measurement": "debug",
+                "time": "",
+                "fields": {}
+            }
+            message["time"]= "{}".format(datetime.datetime.utcnow())
+            #print( "    ", message )
 
             for i in self.values:
                 lastvalue[i]= currvalue[i]
                 currvalue[i]= bus.read_byte_data(self.address,cmd+self.channels[i])
+                # print( "   ", i, lastvalue[i], currvalue[i] )
 
-                #print( "   ", i, lastvalue[i], currvalue[i] )
-
-                if currvalue[i] < lastvalue[i] // 2 :
+            for i in self.values:
+                if currvalue[i]*3 < lastvalue[i] :
                     self.values[i] += self.factors[i]
 
-            time.sleep(sleeptime)
+            for i in self.values:
+                entry= i + "_adc"
+                message["fields"][entry]= currvalue[i]
+                entry= i + "_val"
+                message["fields"][entry]= self.values[i]
+
+            messages[ count % BATCHSIZE ]= message
+            count += 1
+
+            if self.debug and 0 == count % BATCHSIZE :
+
+                delta_t= ( datetime.datetime.strptime(messages[-1]["time"],'%Y-%m-%d %H:%M:%S.%f') - datetime.datetime.strptime(messages[0]["time"],'%Y-%m-%d %H:%M:%S.%f') ).total_seconds()
+                print( "batch {} - {} delta t {}".format( messages[0]["time"], messages[-1]["time"], delta_t ) )
+
+                do_trace= False
+                for i in self.values:
+
+                    entry= i + "_val"
+                    v0= messages[ 0]["fields"][entry]
+                    v1= messages[-1]["fields"][entry]
+                    rate= (v1-v0)*3600/(delta_t) # rate in kW
+
+                    print("    delta ", i, rate )
+                    if rate > LIMIT:
+                        do_trace= True
+
+                if do_trace:
+                    #print( "    ", messages )
+                    self.influx.write_points(messages)
+            else:
+                time.sleep(sleeptime)
 
     def mqtt_callback_connect(self, client, userdata, flags, rc):
         """ callback as defined by the mqtt API for the moment when the connection is made
@@ -74,11 +119,12 @@ class IoTpcf8591pulses(IoTDeviceBase):
             # change the accepted topic, only for the very first one it is going to listen to
             # self.mqtt_topic_periodic. From the second time on it is only listening to self.mqtt_topic_reset
             self.mqtt_topic= self.mqtt_topic_reset
-            
+
             self.mqtt_client.unsubscribe( self.mqtt_topic_periodic )
 
-        else :
-            self.logger.warning( "IoTpcf8591pulses.mqtt_callback_message() unexpected message '{}' '{}' ignored".format( msg.topic, msg.payload ))
+        #else :
+            # this would receive its own messages every minute, ignore and don't warn about it
+            # self.logger.warning( "IoTpcf8591pulses.mqtt_callback_message() unexpected message '{}' '{}' ignored".format( msg.topic, msg.payload ))
 
 
     def mqtt_callback_disconnect(self, client, userdata, rc):
@@ -106,6 +152,21 @@ class IoTpcf8591pulses(IoTDeviceBase):
         if "internal_mqtt_server" in setupdata and "internal_mqtt_port" in setupdata and "internal_mqtt_user" in setupdata and "internal_mqtt_password" in setupdata :
 
             self.retain= True
+
+        if "debug_influx_server" in setupdata and "debug_influx_port" in setupdata and "debug_influx_user" in setupdata and "debug_influx_password" in setupdata and "debug_influx_database" in setupdata:
+
+            self.debug= True
+            self.influx = influxdb.InfluxDBClient(host=self.conf['debug_influx_server'],
+                port=self.conf['debug_influx_port'],
+                username=self.conf['debug_influx_user'],
+                password=self.conf['debug_influx_password'],
+                database=self.conf['debug_influx_database'])
+
+            self.influx.create_database( self.conf['debug_influx_database'] )
+
+        else:
+            self.debug= False
+            self.influx= None
 
         self.values= {}
         self.factors= {}
@@ -137,6 +198,7 @@ class IoTpcf8591pulses(IoTDeviceBase):
     def read_data(self) -> Dict:
 
         val= {}
+
         for i in self.values:
             val[i]= "{:.3f}".format(self.values[i])
 
@@ -159,6 +221,8 @@ class IoTpcf8591pulses(IoTDeviceBase):
 
     def shutdown(self, _) -> None:
         """ nothing to do """
+        if self.influx:
+            self.influx.close()
 
 # must not be a method
 def background_thread( obj ):
