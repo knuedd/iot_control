@@ -55,6 +55,8 @@ class IoTraspicover(IoTDeviceBase):
         state_pin_up = not GPIO.input(pin_up)
         state_pin_down = not GPIO.input(pin_down)
 
+        #print( "callback {}, pin_up {}: {}, pin_down {}: {}".format(pin,pin_up,state_pin_up,pin_down,state_pin_down))
+
         if state_pin_up and state_pin_down:
             self.logger.error("IoTraspicover.__callback(): both input pins "
                               "true --> illegal state")
@@ -137,7 +139,7 @@ class IoTraspicover(IoTDeviceBase):
             cfg["status"] = IoTraspicover.STATE_UNKNOWN
             GPIO.setup(pin_up, GPIO.IN, pull_up_down=GPIO.PUD_UP)
             GPIO.setup(pin_down, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-            GPIO.setup(pin_trigger, GPIO.OUT)
+            GPIO.setup(pin_trigger, GPIO.OUT, initial=GPIO.HIGH)
 
             state_pin_up = not GPIO.input(pin_up)
             state_pin_down = not GPIO.input(pin_down)
@@ -165,6 +167,7 @@ class IoTraspicover(IoTDeviceBase):
             GPIO.add_event_detect(pin_down, GPIO.BOTH, callback=callback,
                                   bouncetime=100)
 
+
     def read_data(self) -> Dict:
         """ don't read real data or gpios but just return the stored status  """
         val = {}
@@ -177,21 +180,27 @@ class IoTraspicover(IoTDeviceBase):
 
     def __trigger_pin_once(self, cfg):
 
-        GPIO.output(cfg["pin_trigger"], GPIO.HIGH)
-        time.sleep(0.1)
+        self.logger.debug("trigger once pin %i: %i -> %i -> %i", 
+                             cfg["pin_trigger"], GPIO.input(cfg["pin_trigger"]), GPIO.LOW, GPIO.HIGH )
+
         GPIO.output(cfg["pin_trigger"], GPIO.LOW)
+        time.sleep(0.1)
+        GPIO.output(cfg["pin_trigger"], GPIO.HIGH)
 
     def __trigger_pin_twice(self, cfg):
 
-        GPIO.output(cfg["pin_trigger"], GPIO.HIGH)
-        time.sleep(0.1)
+        self.logger.debug("trigger twice pin %i: %i -> %i -> %i pause -> %i -> %i", 
+                             cfg["pin_trigger"], GPIO.input(cfg["pin_trigger"]), GPIO.LOW, GPIO.HIGH, GPIO.LOW, GPIO.HIGH )
+
         GPIO.output(cfg["pin_trigger"], GPIO.LOW)
+        time.sleep(0.1)
+        GPIO.output(cfg["pin_trigger"], GPIO.HIGH)
 
         time.sleep(1.0)
 
-        GPIO.output(cfg["pin_trigger"], GPIO.HIGH)
-        time.sleep(0.1)
         GPIO.output(cfg["pin_trigger"], GPIO.LOW)
+        time.sleep(0.1)
+        GPIO.output(cfg["pin_trigger"], GPIO.HIGH)
 
     def set_state(self, messages: Dict) -> bool:
         """ Commands from Home Assistant MQTT arrive here """
@@ -282,4 +291,4 @@ class IoTraspicover(IoTDeviceBase):
         for cover in self.covers:
             cfg = self.covers[cover]
             pin_trigger = cfg["pin_trigger"]
-            GPIO.output(pin_trigger, GPIO.LOW)
+            #GPIO.output(pin_trigger, GPIO.HIGH)

@@ -20,6 +20,7 @@ import iot_control.iot_devices.iotpcf8591pulses
 import iot_control.iot_devices.iotraspibinarysensor
 import iot_control.iot_devices.iotraspistatecover
 import iot_control.iot_devices.iotraspipositionalcover
+import iot_control.iot_devices.iotpwmlight
 import iot_control.backends.influx
 import iot_control.backends.mqtthass
 from iot_control.iotfactory import IoTFactory
