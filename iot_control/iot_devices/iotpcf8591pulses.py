@@ -16,7 +16,7 @@ from iot_control.iotfactory import IoTFactory
 
 import datetime
 import paho.mqtt.client as mqtt
-import influxdb
+import zmq
 
 @IoTFactory.register_device("pcf8591pulses")
 class IoTpcf8591pulses(IoTDeviceBase):
@@ -29,6 +29,7 @@ class IoTpcf8591pulses(IoTDeviceBase):
         cmd=0x40
         num= len(self.values)
         sleeptime= 0.010
+        #sleeptime= 0.005
 
         currvalue= {}
         lastvalue= {}
@@ -36,21 +37,14 @@ class IoTpcf8591pulses(IoTDeviceBase):
             currvalue[i]= 0
             lastvalue[i]= 255
 
-        LIMIT= 3.0 # rate limit, if actual rate > than LIMIT trace values
-
-        BATCHSIZE= 1000
-        messages= [{}] * BATCHSIZE
-        count= 0
-
         while True:
 
-            message = {
-                "measurement": "debug",
-                "time": "",
-                "fields": {}
-            }
-            message["time"]= "{}".format(datetime.datetime.utcnow())
-            #print( "    ", message )
+            message= dict()
+
+            message["time"]= time.time() # "{}".format(datetime.datetime.utcnow())
+            message["adc"]= dict() # value from the ADC
+            message["val"]= dict() # value integrated from the pulses
+            message["sig"]= dict() # value indicating a pulse
 
             for i in self.values:
                 lastvalue[i]= currvalue[i]
@@ -58,38 +52,21 @@ class IoTpcf8591pulses(IoTDeviceBase):
                 # print( "   ", i, lastvalue[i], currvalue[i] )
 
             for i in self.values:
-                if currvalue[i]*3 < lastvalue[i] :
-                    self.values[i] += self.factors[i]
+                message["adc"][i]= currvalue[i]
+                message["val"][i]= self.values[i]
+                message["sig"][i]= 0
 
             for i in self.values:
-                entry= i + "_adc"
-                message["fields"][entry]= currvalue[i]
-                entry= i + "_val"
-                message["fields"][entry]= self.values[i]
+                if currvalue[i] <= 0.2*lastvalue[i] :
+                    self.values[i] += self.factors[i]
+                    message["sig"][i]= 100
 
-            messages[ count % BATCHSIZE ]= message
-            count += 1
+            if self.debug:
+                #print("    ",message)
+                self.sendsocket.send_json( message )
 
-            if self.debug and 0 == count % BATCHSIZE :
+                time.sleep(sleeptime-0.005)
 
-                delta_t= ( datetime.datetime.strptime(messages[-1]["time"],'%Y-%m-%d %H:%M:%S.%f') - datetime.datetime.strptime(messages[0]["time"],'%Y-%m-%d %H:%M:%S.%f') ).total_seconds()
-                print( "batch {} - {} delta t {}".format( messages[0]["time"], messages[-1]["time"], delta_t ) )
-
-                do_trace= False
-                for i in self.values:
-
-                    entry= i + "_val"
-                    v0= messages[ 0]["fields"][entry]
-                    v1= messages[-1]["fields"][entry]
-                    rate= (v1-v0)*3600/(delta_t) # rate in kW
-
-                    print("    delta ", i, rate )
-                    if rate > LIMIT:
-                        do_trace= True
-
-                if do_trace:
-                    #print( "    ", messages )
-                    self.influx.write_points(messages)
             else:
                 time.sleep(sleeptime)
 
@@ -153,20 +130,24 @@ class IoTpcf8591pulses(IoTDeviceBase):
 
             self.retain= True
 
-        if "debug_influx_server" in setupdata and "debug_influx_port" in setupdata and "debug_influx_user" in setupdata and "debug_influx_password" in setupdata and "debug_influx_database" in setupdata:
+        if "debug_zmq_port" in setupdata :
 
             self.debug= True
-            self.influx = influxdb.InfluxDBClient(host=self.conf['debug_influx_server'],
-                port=self.conf['debug_influx_port'],
-                username=self.conf['debug_influx_user'],
-                password=self.conf['debug_influx_password'],
-                database=self.conf['debug_influx_database'])
+            self.logger.info("Debug values via ZMQ")
 
-            self.influx.create_database( self.conf['debug_influx_database'] )
+            # Init ØMQ sender
+
+            self.context = zmq.Context()
+            self.sendsocket = self.context.socket(zmq.PUB)
+            self.sendsocket.bind("tcp://*:%s" % setupdata["debug_zmq_port"] )
+            #categorysocket.setsockopt( zmq.LINGER, 0 )
+            self.sendsocket.setsockopt( zmq.SNDHWM, 10 )
+            self.sendsocket.setsockopt( zmq.RCVHWM, 10 )
 
         else:
             self.debug= False
-            self.influx= None
+            self.context= None
+            self.sendsocket= None
 
         self.values= {}
         self.factors= {}
@@ -221,8 +202,9 @@ class IoTpcf8591pulses(IoTDeviceBase):
 
     def shutdown(self, _) -> None:
         """ nothing to do """
-        if self.influx:
-            self.influx.close()
+        if self.sendsocket:
+            self.sendsocket.close()
+            self.context.term()
 
 # must not be a method
 def background_thread( obj ):
