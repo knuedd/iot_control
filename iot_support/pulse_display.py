@@ -8,7 +8,11 @@ import math
 import zmq
 
 
+<<<<<<< HEAD
+## Support program for the iotpcf8591pulses and powermeter devices for debugging. Receive the ZMQ debug output of such a device
+=======
 ## Support program for the iotpcf8591pulses device for debugging. Receive the ZMQ debug output of such a device
+>>>>>>> 2cccd704cf3a0b698849fdd293e6470664a96ad5
 ## (currently with up to 2 channels) and display them in real time. In addition display the delta t from the
 ## included time stamps
 
