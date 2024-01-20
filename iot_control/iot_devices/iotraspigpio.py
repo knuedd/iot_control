@@ -62,7 +62,7 @@ class IoTraspigpio(IoTDeviceBase):
         val = {}
         for switch in self.switches:
             pin = self.switches[switch]
-            if not GPIO.input(pin):
+            if self.value_off[switch] == GPIO.input(pin):
                 payload = self.conf["payload_off"]
             else:
                 payload = self.conf["payload_on"]
