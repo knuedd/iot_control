@@ -38,6 +38,7 @@ class IoTraspipositionalcover(IoTDeviceBase):
         setupdata = kwargs.get("config")
         self.logger = logging.getLogger("iot_control")
         self.logger.debug("IoTraspipositionalcover.__init__()")
+        print("IoTraspipositionalcover.__init__()")
 
         self.conf = setupdata
         
@@ -64,8 +65,7 @@ class IoTraspipositionalcover(IoTDeviceBase):
             cfg["payload_stop"]= setupdata["payload_stop"]
 
 
-            #self.logger.info("new IoTraspipositionalcover device with input pins %d, %d "
-                # "and output pin %d, initial state %s ", pin_down, pin_up, pin_trigger)
+            self.logger.debug("new IoTraspipositionalcover device with input pins %s ", cfg["motorpins"])
 
             cfg["status"]= 0
             cfg["target"]= 0
@@ -123,6 +123,8 @@ class IoTraspipositionalcover(IoTDeviceBase):
 
                 if self.poscovers[cover]["target"] > self.poscovers[cover]["status"]:
 
+                    self.logger.debug("IoTraspipositionalcover: move up %s by 1 step",cover)
+
                     delta= 1
                     self.move_steps( 0, self.sleeptime, delta*self.step, self.poscovers[cover]["motorpins"] )
                     self.poscovers[cover]["status"] += delta
@@ -130,16 +132,20 @@ class IoTraspipositionalcover(IoTDeviceBase):
 
                 elif self.poscovers[cover]["target"] < self.poscovers[cover]["status"]:
             
+                    self.logger.debug("IoTraspipositionalcover: move down %s by 1 step",cover)
+
                     delta= 1
                     self.move_steps( 1, self.sleeptime, delta*self.step, self.poscovers[cover]["motorpins"] )
                     self.poscovers[cover]["status"] -= delta
                     val[cover] = self.poscovers[cover]["status"]
 
-                ## are we don moving now? Then stop motor for this cover
+                ## are we done moving now? Then stop motor for this cover
                 if self.poscovers[cover]["target"] == self.poscovers[cover]["status"]:
 
                     self.motor_stop( self.poscovers[cover]["motorpins"] )
-    
+
+                    self.logger.debug("IoTraspipositionalcover: stopped motor on pin %s",self.poscovers[cover]["motorpins"])
+
                 # if one poscover was moved one step, don't go on to the next but break the cover loop
                 # this makes one cover move to the final position before the next starts moving
                 # which is much nicer and smoother
@@ -172,6 +178,8 @@ class IoTraspipositionalcover(IoTDeviceBase):
 
                 # need to trigger on last time so that the target value gets transfered
                 self.runtime.trigger_for_device(self)
+
+        self.logger.debug("IoTraspipositionalcover.read_data(): return %s",val)
 
         return val
 
