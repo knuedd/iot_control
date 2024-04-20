@@ -19,6 +19,8 @@ class IoTraspigpio(IoTDeviceBase):
     # stores mapping of switches to pins
     switches = {}
     autooff = {}
+    value_on = {}
+    value_off = {}
     handle = {} # handle for a pending autooff event
 
     def __init__(self, **kwargs):
@@ -41,7 +43,15 @@ class IoTraspigpio(IoTDeviceBase):
             pin = cfg["pin"]
             if "autooff" in cfg:
                 self.autooff[switch] = cfg["autooff"]
-            GPIO.setup(pin, GPIO.OUT)  # GPIO Modus zuweisen
+            self.value_on[switch]= GPIO.HIGH
+            self.value_off[switch]= GPIO.LOW
+
+            #print("default: on == HIGH and off == LOW" )
+            if "inverse" in cfg and cfg["inverse"] > 0 :
+                self.value_on[switch]= GPIO.LOW
+                self.value_off[switch]= GPIO.HIGH
+                #print("inverse: on == LOW and off == HIGH" )
+            GPIO.setup(pin, GPIO.OUT, initial=self.value_off[switch])  # GPIO Modus zuweisen
             self.switches[switch] = pin
 
     def give_scheduled_event_handle(self,handle,msg) -> None: # TODO
@@ -52,7 +62,7 @@ class IoTraspigpio(IoTDeviceBase):
         val = {}
         for switch in self.switches:
             pin = self.switches[switch]
-            if not GPIO.input(pin):
+            if self.value_off[switch] == GPIO.input(pin):
                 payload = self.conf["payload_off"]
             else:
                 payload = self.conf["payload_on"]
@@ -66,14 +76,13 @@ class IoTraspigpio(IoTDeviceBase):
         for msg in messages:
             if msg in self.switches:
                 pin = self.switches[msg]
-                GPIO.setup(pin, GPIO.OUT)
                 if messages[msg] == self.conf["payload_on"]:
-                    GPIO.output(pin, GPIO.HIGH)
+                    GPIO.output(pin, self.value_on[msg])
                     if msg in self.autooff:
                         self.runtime.schedule_for_device(
                             self.autooff[msg], self, msg, self.conf["payload_off"])
                 elif messages[msg] == self.conf["payload_off"]:
-                    GPIO.output(pin, GPIO.LOW)
+                    GPIO.output(pin, self.value_off[msg])
                     if msg in self.autooff and msg in self.handle:
                         if None != self.handle[msg]:
                             self.handle[msg].cancel()
