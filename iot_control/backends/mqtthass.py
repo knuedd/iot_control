@@ -101,8 +101,7 @@ class BackendMqttHass(IoTBackendBase):
         elif "poscovers" in device.conf:
             for entry in data:
                 if entry in state_topics:
-                    #val = data[entry]
-                    val = {entry: data[entry]}
+                    val = data[entry]
                     state_topic = state_topics[entry]
                     self.logger.debug("new mqtt value for %s : %s", state_topic, val)
                     #self.mqtt_client.publish(state_topic, val, retain=True)
